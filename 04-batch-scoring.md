@@ -2,8 +2,6 @@
 
 Pada modul ini Anda menggunakan model **`lgbm_sm` versi 1** (dari Modul 3) untuk melakukan **batch inference** pada `df_test` lalu menyimpan hasil prediksi ke Lakehouse — siap dipakai oleh Power BI di Modul 5.
 
-📖 Referensi: <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-batch-scoring>
-
 ---
 
 ## 🎯 Tujuan
@@ -78,6 +76,17 @@ import pandas
 predictions = model.transform(df_test)
 display(predictions)
 ```
+
+> ⚠️ **Jika muncul error `ValueError: Cannot convert numpy type object to spark type`**, artinya `df_test` punya kolom bertipe `boolean` (hasil `pd.get_dummies` tanpa `dtype=int` di Modul 2). Dua opsi fix:
+>
+> 1. **Fix utama (disarankan)** — kembali ke [Modul 2](./02-explore-cleanse-data.md) langkah 6, ubah jadi `pd.get_dummies(..., dtype=int)`, lalu rerun Modul 2 → 3 → 4.
+> 2. **Workaround cepat** — cast kolom boolean ke int sebelum `model.transform()`:
+>     ```python
+>     from pyspark.sql.functions import col
+>     for f, t in df_test.dtypes:
+>         if t == 'boolean':
+>             df_test = df_test.withColumn(f, col(f).cast('int'))
+>     ```
 
 ---
 

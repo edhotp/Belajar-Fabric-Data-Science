@@ -2,8 +2,6 @@
 
 Pada modul ini Anda akan menggunakan **Apache Spark** di Fabric Notebook untuk meng-ingest data CSV publik ke dalam **Delta Table** di Lakehouse.
 
-📖 Referensi: <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-ingest-data>
-
 ---
 
 ## 🎯 Tujuan

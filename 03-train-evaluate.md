@@ -2,8 +2,6 @@
 
 Pada modul ini Anda melatih beberapa model klasifikasi untuk memprediksi churn nasabah, melakukan tracking eksperimen dengan **MLflow**, lalu meregistrasi model ke **Fabric Model Registry**.
 
-📖 Referensi: <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-train-models>
-
 ---
 
 ## 🎯 Tujuan

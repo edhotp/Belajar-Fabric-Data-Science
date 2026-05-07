@@ -2,8 +2,6 @@
 
 Modul terakhir ini membangun **Power BI report** dari tabel prediksi yang Anda hasilkan di Modul 4 (`df_test_with_predictions_v1`) menggunakan **DirectLake**.
 
-📖 Referensi: <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-create-report>
-
 ---
 
 ## 🎯 Tujuan

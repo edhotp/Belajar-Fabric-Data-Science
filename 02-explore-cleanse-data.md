@@ -2,8 +2,6 @@
 
 Pada modul ini Anda melakukan **Exploratory Data Analysis (EDA)** dan **data cleansing** menggunakan kombinasi **Apache Spark**, **pandas**, **Seaborn**, dan **Data Wrangler**.
 
-📖 Referensi: <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-explore-notebook>
-
 ---
 
 ## 🎯 Tujuan
@@ -242,7 +240,7 @@ def clean_data(df_clean):
         insert_loc = df_clean.columns.get_loc(column)
         df_clean = pd.concat(
             [df_clean.iloc[:, :insert_loc],
-             pd.get_dummies(df_clean.loc[:, [column]]),
+             pd.get_dummies(df_clean.loc[:, [column]], dtype=int),
              df_clean.iloc[:, insert_loc + 1:]],
             axis=1,
         )
@@ -258,12 +256,20 @@ Versi ringkas (hasil yang sama):
 import pandas as pd
 
 def clean_data(df_clean):
-    df_clean = pd.get_dummies(df_clean, columns=['Geography', 'Gender'])
+    df_clean = pd.get_dummies(df_clean, columns=['Geography', 'Gender'], dtype=int)
     return df_clean
 
 df_clean_1 = clean_data(df_clean.copy())
 df_clean_1.head()
 ```
+
+> ⚠️ **Penting — wajib pakai `dtype=int`.** Pada pandas ≥ 2.0, default `pd.get_dummies` menghasilkan kolom bertipe **`bool`** (`True`/`False`). Tipe ini akan tersimpan sebagai `object` di MLflow signature saat training di Modul 3, sehingga di Modul 4 `MLFlowTransformer` akan gagal dengan error:
+>
+> ```
+> ValueError: Cannot convert numpy type object to spark type
+> ```
+>
+> Dengan `dtype=int`, dummy variabel disimpan sebagai `0/1` dan signature model menjadi numerik yang valid untuk Spark.
 
 ---
 
