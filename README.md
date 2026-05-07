@@ -1,7 +1,6 @@
 # Tutorial Series: Microsoft Fabric Data Science — End-to-End
 
-Tutorial series ini menyajikan skenario **end-to-end Data Science** di Microsoft Fabric, mulai dari ingest data hingga visualisasi prediksi di Power BI. Materi disusun berdasarkan dokumentasi resmi Microsoft Learn:
-👉 <https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-introduction>
+Tutorial series ini menyajikan skenario **end-to-end Data Science** di Microsoft Fabric, mulai dari ingest data hingga visualisasi prediksi di Power BI.
 
 > Studi kasus: Anda berperan sebagai **Data Scientist** sebuah bank yang ingin memprediksi nasabah mana yang berpotensi *churn* (menutup rekening) dari dataset 10.000 nasabah.
 
@@ -83,7 +82,7 @@ flowchart TD
 
 ## ⚠️ Disclaimer
 
-Materi tutorial ini disusun untuk **tujuan edukasi dan pembelajaran pribadi**, berdasarkan dokumentasi resmi [Microsoft Learn — Fabric Data Science](https://learn.microsoft.com/en-us/fabric/data-science/tutorial-data-science-introduction).
+Materi tutorial ini disusun untuk **tujuan edukasi dan pembelajaran pribadi**.
 
 - Konten teks merupakan adaptasi/terjemahan bebas ke Bahasa Indonesia oleh penulis repo ini, **bukan** dokumen resmi dari Microsoft.
 - Seluruh **gambar, diagram, dan screenshot** yang ditampilkan adalah hak cipta **© Microsoft Corporation** dan diambil langsung dari Microsoft Learn untuk kepentingan referensi pembelajaran.
