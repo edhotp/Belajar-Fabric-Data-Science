@@ -31,7 +31,7 @@ Pada modul ini Anda akan menggunakan **Apache Spark** di Fabric Notebook untuk m
 flowchart LR
     S[(Azure Open<br/>Datasets<br/>churn.csv)] -->|HTTP GET| N[Fabric Notebook<br/>PySpark]
     N -->|tulis raw CSV| F["📂 Lakehouse<br/>Files/churn/raw/"]
-    F -.opsional.->|spark.read.csv<br/>+ write Delta| T["🗃️ Lakehouse<br/>Tables/churn"]
+    F -.->|"opsional:<br/>spark.read.csv<br/>+ write Delta"| T["🗃️ Lakehouse<br/>Tables/churn"]
 
     style S fill:#e1f5ff
     style F fill:#fff4e6
