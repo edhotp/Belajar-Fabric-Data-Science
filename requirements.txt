@@ -1,0 +1,26 @@
+# =============================================================================
+# Requirements untuk Tutorial Series — Microsoft Fabric Data Science
+# =============================================================================
+# File ini dipakai oleh Modul 7 (Create Environment) untuk meng-install library
+# tambahan ke Fabric Environment. Semua library di sini akan tersedia otomatis
+# di setiap notebook yang attached ke environment tersebut.
+#
+# CATATAN:
+# - Library "built-in" (pandas, numpy, scikit-learn, mlflow, lightgbm, seaborn,
+#   matplotlib, pyspark, synapse-ml, requests) sudah pre-installed di Fabric
+#   Spark runtime — TIDAK perlu di-list ulang. Lihat:
+#   https://learn.microsoft.com/en-us/fabric/data-engineering/runtime
+# - Yang di-list di sini hanya:
+#     1. Library yang TIDAK ada di runtime default (mis. imblearn)
+#     2. Pin versi spesifik untuk reproducibility tutorial
+# =============================================================================
+
+# Modul 3 — Train & Evaluate (SMOTE oversampling)
+imbalanced-learn==0.12.3
+
+# Modul 3 & 6 — pin versi agar konsisten dengan langkah-langkah di tutorial
+scikit-learn==1.6.1
+mlflow==2.12.2
+
+# Modul 6 — REST API call ke ML Model Endpoint (auth via Entra ID)
+azure-identity>=1.17.0

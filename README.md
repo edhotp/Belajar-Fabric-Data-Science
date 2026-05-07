@@ -20,6 +20,9 @@ Tutorial series ini menyajikan skenario **end-to-end Data Science** di Microsoft
 | 3 | [Train & Evaluate Models](./03-train-evaluate.md) | Train Random Forest & LightGBM + tracking dengan MLflow |
 | 4 | [Batch Scoring](./04-batch-scoring.md) | Inference batch dengan PREDICT |
 | 5 | [Create Power BI Report](./05-create-report.md) | Visualisasi hasil prediksi dengan Power BI |
+| 6 | [ML Model Endpoints](./06-model-endpoints.md) | Real-time inference via REST API endpoint (Preview) |
+| 7 | [Create Environment](./07-create-environment.md) *(opsional)* | Setup Fabric Environment terpusat + `requirements.txt` |
+| 8 | [AutoML dengan FLAML](./08-automl.md) | Automated ML — bandingkan model manual vs auto-selected |
 
 ---
 
