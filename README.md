@@ -1,6 +1,6 @@
 # Tutorial Series: Microsoft Fabric Data Science — End-to-End
 
-Tutorial series ini menyajikan skenario **end-to-end Data Science** di Microsoft Fabric, mulai dari ingest data hingga visualisasi prediksi di Power BI.
+Tutorial series ini menyajikan skenario **end-to-end Data Science** di Microsoft Fabric, mulai dari ingest data hingga visualisasi prediksi di Power BI. Materi disusun berdasarkan dokumentasi resmi Microsoft.
 
 > Studi kasus: Anda berperan sebagai **Data Scientist** sebuah bank yang ingin memprediksi nasabah mana yang berpotensi *churn* (menutup rekening) dari dataset 10.000 nasabah.
 
@@ -82,12 +82,12 @@ flowchart TD
 
 ## ⚠️ Disclaimer
 
-Materi tutorial ini disusun untuk **tujuan edukasi dan pembelajaran pribadi**.
+Materi tutorial ini disusun untuk **tujuan edukasi dan pembelajaran pribadi**, berdasarkan dokumentasi resmi Microsoft.
 
 - Konten teks merupakan adaptasi/terjemahan bebas ke Bahasa Indonesia oleh penulis repo ini, **bukan** dokumen resmi dari Microsoft.
-- Seluruh **gambar, diagram, dan screenshot** yang ditampilkan adalah hak cipta **© Microsoft Corporation** dan diambil langsung dari Microsoft Learn untuk kepentingan referensi pembelajaran.
+- Seluruh **gambar, diagram, dan screenshot** yang ditampilkan adalah hak cipta **© Microsoft Corporation** dan diambil langsung dari dokumentasi resmi Microsoft untuk kepentingan referensi pembelajaran.
 - Nama produk seperti *Microsoft Fabric*, *Power BI*, *Azure*, dan *MLflow* adalah merek dagang dari pemiliknya masing-masing.
-- Penulis **tidak berafiliasi resmi** dengan Microsoft. Untuk informasi paling akurat dan terbaru, selalu rujuk ke dokumentasi resmi Microsoft Learn.
+- Penulis **tidak berafiliasi resmi** dengan Microsoft. Untuk informasi paling akurat dan terbaru, selalu rujuk ke dokumentasi resmi Microsoft.
 - Repo ini disediakan **"as is"** tanpa jaminan apa pun. Penulis tidak bertanggung jawab atas biaya, kerugian, atau konsekuensi yang timbul dari penggunaan materi di sini.
 
 Jika Anda adalah pemilik hak cipta dan keberatan dengan penggunaan materi tertentu, silakan buka issue di repository ini.
