@@ -1,12 +1,12 @@
 # Modul 8 — AutoML dengan FLAML (Automated Machine Learning)
 
-> 🎯 **Tujuan**: Membandingkan **model yang dipilih manual** (Modul 3) dengan **model otomatis** yang dipilih oleh **FLAML AutoML** — supaya kamu paham kapan butuh AutoML dan kapan tidak.
+> 🎯 **Tujuan**: Memahami **Automated ML (AutoML)** di Microsoft Fabric menggunakan **FLAML** — dari load data, training baseline, AutoML trial, parallelisasi dengan Spark, sampai register model & batch prediction.
 
-> ⏱️ **Estimasi waktu**: 30–45 menit (termasuk AutoML trial 250 detik × 2)
+> ⏱️ **Estimasi waktu**: 30–45 menit (termasuk dua AutoML trial × 120 detik)
 
 > 📚 **Referensi resmi**: [Create models with Automated ML — MS Learn](https://learn.microsoft.com/en-us/fabric/data-science/how-to-use-automated-machine-learning-fabric)
 
-> 🧩 **Prasyarat**: Modul 1 & 2 sudah selesai (sudah ada Delta table `churn_data_clean` di lakehouse). Kalau belum, balik dulu ke [Modul 2](./02-explore-cleanse-data.md).
+> 📓 **Notebook**: [`notebooks/Automated ML (AutoML)-69.ipynb`](notebooks/Automated%20ML%20%28AutoML%29-69.ipynb) — notebook **self-contained** (tidak bergantung Modul 1/2). Bisa dijalankan langsung asalkan ada lakehouse.
 
 ---
 
@@ -15,13 +15,13 @@
 1. [Apa itu AutoML?](#1-apa-itu-automl)
 2. [Kenapa FLAML di Fabric?](#2-kenapa-flaml-di-fabric)
 3. [Arsitektur tutorial ini](#3-arsitektur-tutorial-ini)
-4. [Step 1 — Setup notebook](#4-step-1--setup-notebook)
-5. [Step 2 — Load data dari Lakehouse](#5-step-2--load-data-dari-lakehouse)
-6. [Step 3 — Train baseline model (LightGBM manual)](#6-step-3--train-baseline-model-lightgbm-manual)
+4. [Step 1 — Load data](#4-step-1--load-data)
+5. [Step 2 — Eksplorasi & preprocessing](#5-step-2--eksplorasi--preprocessing)
+6. [Step 3 — Train baseline model (LightGBM)](#6-step-3--train-baseline-model-lightgbm)
 7. [Step 4 — AutoML trial dengan FLAML](#7-step-4--automl-trial-dengan-flaml)
 8. [Step 5 — Parallel AutoML pakai Spark](#8-step-5--parallel-automl-pakai-spark)
-9. [Step 6 — Bandingkan hasil di MLflow UI](#9-step-6--bandingkan-hasil-di-mlflow-ui)
-10. [Step 7 — Register & gunakan model terbaik](#10-step-7--register--gunakan-model-terbaik)
+9. [Step 6 — Register model terbaik](#9-step-6--register-model-terbaik)
+10. [Step 7 — Batch prediction dengan PREDICT](#10-step-7--batch-prediction-dengan-predict)
 11. [Best Practices & Troubleshooting](#11-best-practices--troubleshooting)
 12. [Cleanup](#12-cleanup)
 13. [Referensi](#13-referensi)
@@ -41,6 +41,13 @@
 
 > 🧠 **Analogi**: Manual = kamu masak sendiri (tahu persis bumbu mana yang cocok). AutoML = kamu kasih bahan ke chef robot, dia coba 50 resep sekaligus dan pilih yang paling enak menurut kriteria kamu.
 
+> ⚠️ **Penting**: AutoML di Fabric (FLAML) **tidak melakukan data cleansing otomatis**. Kamu tetap harus:
+> - Buang missing values & duplikat
+> - One-hot encode kolom kategorikal
+> - Drop kolom ID/tidak relevan
+>
+> Yang di-otomatisasi hanya: **pilih algoritma + tuning hyperparameter + cross-validation**.
+
 ---
 
 ## 2. Kenapa FLAML di Fabric?
@@ -52,8 +59,10 @@
 | ⚡ Cepat | Algoritma *cost-effective hyperparameter optimization* (CFO + BlendSearch) |
 | 🐍 Python native | Cukup `from flaml import AutoML` |
 | 🔄 Spark integration | Mendukung *Pandas-on-Spark* + paralel di Spark cluster |
-| 📊 MLflow ready | Auto-log ke experiment yang sama dengan Modul 3 |
+| 📊 MLflow ready | Auto-log ke experiment yang sama dengan baseline |
 | 🆓 Built-in di Fabric | Tidak perlu `pip install` (Runtime 1.2+) |
+
+> ⚠️ **Catatan Runtime**: AutoML di Fabric butuh **Runtime 1.2+ (Spark 3.4)** atau lebih baru.
 
 ---
 
@@ -61,96 +70,207 @@
 
 ```mermaid
 flowchart LR
-    A[("Delta table<br/>churn_data_clean<br/>dari Modul 2")] -->|load| B[Spark DataFrame]
-    B -->|VectorAssembler| C[train_data + test_data]
-    C -->|LightGBM<br/>manual| D[Baseline<br/>ROC AUC ~0.84]
-    C -->|to_pandas_on_spark| E[df_automl]
-    E -->|FLAML AutoML<br/>250s budget| F[Best model<br/>auto-selected]
-    E -->|FLAML + Spark<br/>parallel 3 trials| G[Best model<br/>parallel]
-    D & F & G -->|log| H[("📊 MLflow Experiment<br/>automl_sample")]
-    H -->|compare| I[Pick winner →<br/>Register]
+    A[("📥 churn.csv<br/>10.000 customers")] -->|Step 1| B[Spark DataFrame]
+    B -->|Step 2:<br/>clean + one-hot| C[("Delta table<br/>churn_data_clean")]
+    C -->|VectorAssembler| D[train_data + test_data]
+    D -->|Step 3:<br/>LightGBM manual| E[Baseline<br/>ROC AUC ~0.84]
+    D -->|Step 4:<br/>FLAML 120s| F[AutoML trial<br/>Pandas-on-Spark]
+    D -->|Step 5:<br/>FLAML + Spark<br/>3 parallel| G[Parallel AutoML]
+    E & F & G -->|log| H[("📊 MLflow<br/>sample-automl-experiment")]
+    G -->|Step 6| I[("📦 Registered<br/>churn_model")]
+    I -->|Step 7:<br/>MLFlowTransformer| J[("🗂️ Lakehouse<br/>batch_predictions")]
 
     style A fill:#fff4e6,stroke:#f7630c
+    style C fill:#e6f3ff,stroke:#0078d4
     style H fill:#f3e8ff,stroke:#8764b8
     style I fill:#e6ffe6,stroke:#107c10
+    style J fill:#e6ffe6,stroke:#107c10
 ```
 
 ---
 
-## 4. Step 1 — Setup notebook
+## Setup notebook
 
-1. Buka workspace Fabric → **+ New** → **Notebook**.
-2. Beri nama: `08-automl-churn.ipynb`.
-3. Di sidebar kiri → **Add lakehouse** → pilih lakehouse yang sama dari Modul 1 (sudah berisi table `churn_data_clean`).
-4. *(Opsional)* Attach environment `tutorial-ds-env` dari [Modul 7](./07-create-environment.md).
+1. Buka workspace Fabric → **+ New** → **Import notebook** → unggah [`notebooks/Automated ML (AutoML)-69.ipynb`](notebooks/Automated%20ML%20%28AutoML%29-69.ipynb).
+2. Di sidebar kiri notebook → **Add lakehouse** → pilih lakehouse yang ada (atau buat baru).
+3. *(Opsional)* Attach environment `tutorial-ds-env` dari [Modul 7](./07-create-environment.md).
+4. Pastikan **Runtime 1.2+** (Workspace settings → Spark settings).
 
-> ⚠️ **Pastikan Runtime 1.2 atau 1.3** (Workspace settings → Spark settings). FLAML built-in mulai Runtime 1.2.
+> 💡 Notebook ini **self-contained**: Step 1 download CSV langsung dari URL, jadi tidak perlu menjalankan Modul 1/2 dulu. Tapi kalau kamu sudah punya `churn_data_clean` dari Modul 2, kamu bisa skip Step 1 & 2 dan langsung lompat ke Step 3.
 
 ---
 
-## 5. Step 2 — Load data dari Lakehouse
+## 4. Step 1 — Load data
 
-Karena kita sudah punya `churn_data_clean` (hasil Modul 2), tinggal load:
+### Dataset: Bank Customer Churn
+
+10.000 baris × 14 kolom. Target: kolom **`Exited`** (1 = customer keluar dari bank, 0 = tetap). Dataset **imbalanced**: hanya ~20% (2.037) yang churn.
+
+| Kolom penting | Tipe |
+|---|---|
+| `CreditScore`, `Age`, `Tenure`, `Balance`, `EstimatedSalary` | Numerik |
+| `Geography` (France/Germany/Spain), `Gender` (Male/Female) | Kategorikal |
+| `NumOfProducts`, `HasCrCard`, `IsActiveMember` | Numerik biner |
+| `RowNumber`, `CustomerId`, `Surname` | ID — akan dibuang |
+| **`Exited`** | **Target (0/1)** |
+
+### Download data ke lakehouse
 
 ```python
-# Load cleaned dataset dari Modul 2
-df_final = spark.read.format("delta").load("Tables/churn_data_clean")
+import os
+import requests
 
-print(f"Total rows: {df_final.count()}")
-df_final.printSchema()
+IS_CUSTOM_DATA = False  # if TRUE, dataset has to be uploaded manually
+
+if not IS_CUSTOM_DATA:
+    remote_url = "https://synapseaisolutionsa.z13.web.core.windows.net/data/bankcustomerchurn"
+    file_list = ["churn.csv"]
+    download_path = "/lakehouse/default/Files/churn/raw"
+
+    if not os.path.exists("/lakehouse/default"):
+        raise FileNotFoundError("Default lakehouse not found. Please add a lakehouse and restart the session.")
+
+    os.makedirs(download_path, exist_ok=True)
+
+    for fname in file_list:
+        if not os.path.exists(f"{download_path}/{fname}"):
+            r = requests.get(f"{remote_url}/{fname}", timeout=30)
+            with open(f"{download_path}/{fname}", "wb") as f:
+                f.write(r.content)
+
+    print("Downloaded demo data files into lakehouse.")
 ```
 
-> 💡 Kalau table belum ada → balik ke [Modul 2](./02-explore-cleanse-data.md) dan jalankan sampai akhir.
+### Read raw CSV → Spark DataFrame
 
-### Buat features + train/test split
+```python
+df = (
+    spark.read.option("header", True)
+    .option("inferSchema", True)
+    .csv("Files/churn/raw/churn.csv")
+    .cache()
+)
+```
+
+> 💡 `.cache()` mempercepat operasi berikutnya karena Spark menyimpan dataframe di memory.
+
+---
+
+## 5. Step 2 — Eksplorasi & preprocessing
+
+### Display + summary statistics
+
+```python
+display(df, summary=True)
+```
+
+> 📊 Fabric `display()` punya tab **Chart** & **Summary** built-in — jauh lebih kaya dari `df.show()` biasa.
+
+### Cleaning function
+
+```python
+def clean_data(df):
+    # Drop rows with missing data across all columns
+    df = df.dropna(how="all")
+    # Drop duplicate rows in columns: 'RowNumber', 'CustomerId'
+    df = df.dropDuplicates(subset=["RowNumber", "CustomerId"])
+    # Drop columns: 'RowNumber', 'CustomerId', 'Surname'
+    df = df.drop("RowNumber", "CustomerId", "Surname")
+    return df
+
+df_copy = df.select("*")
+df_clean = clean_data(df_copy)
+```
+
+| Operasi | Kenapa |
+|---|---|
+| `dropna(how="all")` | Buang baris yang **semua** kolomnya kosong |
+| `dropDuplicates(subset=["RowNumber","CustomerId"])` | Hindari customer ganda |
+| `drop("RowNumber","CustomerId","Surname")` | Kolom ID tidak punya predictive power, malah bikin model overfit |
+
+### One-hot encoding kolom kategorikal
+
+```python
+from pyspark.sql import functions as F
+
+df_clean = df_clean.select(
+    "*",
+    F.when(F.col("Geography") == "France", 1).otherwise(0).alias("Geography_France"),
+    F.when(F.col("Geography") == "Germany", 1).otherwise(0).alias("Geography_Germany"),
+    F.when(F.col("Geography") == "Spain", 1).otherwise(0).alias("Geography_Spain"),
+    F.when(F.col("Gender") == "Female", 1).otherwise(0).alias("Gender_Female"),
+    F.when(F.col("Gender") == "Male", 1).otherwise(0).alias("Gender_Male"),
+)
+
+df_clean = df_clean.drop("Geography", "Gender")
+```
+
+> 🔑 **Wajib**: AutoML/FLAML butuh semua kolom **numerik**. String seperti "France" harus di-encode dulu jadi 0/1.
+
+### Save ke lakehouse sebagai Delta table
+
+```python
+df_clean.write.mode("overwrite").format("delta").save("Tables/churn_data_clean")
+print("Spark dataframe saved to delta table: churn_data_clean")
+```
+
+> 💾 Hasilnya bisa di-query SQL, dipakai di Power BI Direct Lake, dan tahan banting (ACID).
+
+---
+
+## 6. Step 3 — Train baseline model (LightGBM)
+
+Sebelum AutoML, kita train **baseline manual** dulu — supaya nanti bisa dibandingkan apakah AutoML benar-benar lebih baik.
+
+### Load data + train/test split
+
+```python
+df_final = spark.read.format("delta").load("Tables/churn_data_clean")
+```
 
 ```python
 from pyspark.ml.feature import VectorAssembler
 
-# Train-Test split 80/20 (seed=41 mengikuti dokumentasi MS Learn)
+# Train-Test split 80/20 (seed=41)
 train_raw, test_raw = df_final.randomSplit([0.8, 0.2], seed=41)
 
-# Semua kolom kecuali target "Exited" jadi feature
-feature_cols = [c for c in df_final.columns if c != "Exited"]
+# Semua kolom kecuali "Exited" jadi feature
+feature_cols = [col for col in df_final.columns if col != "Exited"]
 
-# Gabungkan jadi vector "features" (format yang Spark ML butuhkan)
+# Gabung jadi vector "features"
 featurizer = VectorAssembler(inputCols=feature_cols, outputCol="features")
 
 train_data = featurizer.transform(train_raw)["Exited", "features"]
 test_data  = featurizer.transform(test_raw)["Exited", "features"]
-
-print(f"train_data: {train_data.count()} rows")
-print(f"test_data:  {test_data.count()} rows")
 ```
 
----
+### Setup logging + MLflow
 
-## 6. Step 3 — Train baseline model (LightGBM manual)
+```python
+import logging
 
-Ini **baseline** — model yang kita pilih sendiri tanpa AutoML, supaya nanti bisa dibandingkan.
-
-### Setup MLflow
+# Suppress log SynapseML & MLflow yang verbose
+logging.getLogger("synapse.ml").setLevel(logging.CRITICAL)
+logging.getLogger("mlflow.utils").setLevel(logging.CRITICAL)
+```
 
 ```python
 import mlflow
-import logging
 
-# Suppress log SynapseML yang verbose
-logging.getLogger('synapse.ml').setLevel(logging.ERROR)
-
-# Set experiment + enable autolog (params, metrics, model otomatis ter-log)
-mlflow.set_experiment("automl_sample")
+# Auto-log params, metrics, model
 mlflow.autolog(exclusive=False)
+
+# Set experiment name (dipakai juga di Step 4)
+mlflow.set_experiment("sample-automl-experiment")
 ```
 
-### Train + evaluate
+### Train + evaluate baseline
 
 ```python
 from synapse.ml.lightgbm import LightGBMClassifier
 from sklearn.metrics import roc_auc_score
 
-with mlflow.start_run(run_name="baseline_lightgbm") as run:
-    # LightGBM dari SynapseML (terdistribusi di Spark)
+with mlflow.start_run(run_name="default") as run:
     model = LightGBMClassifier(
         objective="binary",
         featuresCol="features",
@@ -159,219 +279,246 @@ with mlflow.start_run(run_name="baseline_lightgbm") as run:
     )
 
     model = model.fit(train_data)
-
-    # Predict di test set
     predictions = model.transform(test_data)
 
-    # Ekstrak probabilitas kelas positif (index [1])
+    # Probabilitas kelas positif (index [1])
     y_pred = predictions.select("probability").rdd.map(lambda x: x[0][1]).collect()
     y_true = test_data.select("Exited").rdd.map(lambda x: x[0]).collect()
 
     roc_auc = roc_auc_score(y_true, y_pred)
-    mlflow.log_metric("ROC_AUC", roc_auc)
+    mlflow.log_metric("roc_auc", roc_auc)
 
-    print(f"✅ Baseline ROC AUC: {roc_auc:.4f}")
+    print("ROC AUC Score:", roc_auc)
 ```
 
-> 📊 Hasil dokumentasi MS Learn: **ROC AUC ≈ 0.84**. Hasil kamu mungkin sedikit beda karena randomness.
+> 📊 Hasil ekspektasi: **ROC AUC ≈ 0.84**.
 
 ---
 
 ## 7. Step 4 — AutoML trial dengan FLAML
 
-Sekarang kita biarkan FLAML cari model + hyperparameter terbaik **secara otomatis**.
+Sekarang biarkan FLAML cari model + hyperparameter terbaik **secara otomatis**.
 
-### Import & inisialisasi
+### Inisialisasi & konfigurasi
 
 ```python
 from flaml import AutoML
 from flaml.automl.spark.utils import to_pandas_on_spark
 
-automl = AutoML()
-```
+automl_spark = AutoML()
 
-### Konfigurasi AutoML trial
-
-```python
 settings = {
-    "time_budget": 250,                    # Total waktu eksplorasi (detik)
-    "metric": "roc_auc",                   # Metric yang dioptimasi
-    "task": "classification",              # Jenis task
+    "time_budget": 120,                            # Detik
+    "max_iter": 3,                                 # Maksimum jumlah trial
+    "metric": "roc_auc",                           # Metric yang dioptimasi
+    "task": "classification",                      # Jenis task
     "log_file_name": "flaml_experiment.log",
-    "seed": 41,                            # Reproducibility
-    "force_cancel": True,                  # Stop kalau lewat time_budget
-    "mlflow_exp_name": "automl_sample",   # Same experiment dengan baseline
+    "seed": 41,                                    # Reproducibility
+    "mlflow_exp_name": "sample-automl-experiment", # Sama dengan baseline
+    "verbose": 1,
 }
 ```
 
-| Setting | Penjelasan untuk pemula |
+| Setting | Penjelasan |
 |---|---|
-| `time_budget` | Berapa detik FLAML boleh "main" cari model. Makin lama, makin bagus (sampai titik tertentu). 250s = ~4 menit cocok untuk demo. |
-| `metric` | Apa yang mau dimaksimalkan? `roc_auc` cocok untuk binary classification yang imbalance. Pilihan lain: `accuracy`, `f1`, `log_loss`. |
-| `task` | `classification` / `regression` / `ts_forecast` / `rank` / `seq-classification` / `multichoice-classification` |
-| `force_cancel` | `True` = kalau habis waktu, langsung stop. Berguna di Fabric agar tidak boros CU. |
-| `seed` | Angka acak — sama → hasil sama. |
+| `time_budget` | Berapa detik FLAML boleh "main". 120s cocok untuk demo. |
+| `max_iter` | Batas jumlah model yang dicoba. Set kecil (3) untuk demo cepat. |
+| `metric` | `roc_auc` cocok untuk klasifikasi binary imbalance. |
+| `task` | `classification` / `regression` / `ts_forecast` / dll. |
+| `seed` | Sama → hasil sama (reproducible). |
+| `mlflow_exp_name` | Pakai experiment yang sama → mudah bandingkan dengan baseline. |
+| `verbose` | 0=silent, 1=normal, 2=detail, 3=debug |
 
 ### Convert Spark → Pandas-on-Spark
 
-FLAML butuh format **Pandas-on-Spark** supaya bisa proses data Spark tanpa harus collect ke driver:
+FLAML butuh format **Pandas-on-Spark** untuk proses Spark dataset:
 
 ```python
 df_automl = to_pandas_on_spark(train_data)
-print(f"Type: {type(df_automl).__name__}")  # → DataFrame (pyspark.pandas)
 ```
 
 ### Jalankan AutoML
 
 ```python
-with mlflow.start_run(nested=True, run_name="automl_trial") as automl_run:
-    automl.fit(
+with mlflow.start_run(nested=True, run_name="spark_automl"):
+    automl_spark.fit(
         dataframe=df_automl,
         label="Exited",
-        isUnbalance=True,    # Penting: dataset churn imbalanced
+        isUnbalance=True,           # Penting: dataset imbalanced
+        dataTransferMode="bulk",    # Untuk LightGBM-on-Spark
         **settings,
     )
 ```
 
-> ⏳ **Tunggu ~4 menit**. FLAML akan coba LightGBM, XGBoost, RandomForest, ExtraTrees, dll. dengan kombinasi hyperparameter berbeda. Progress tampil di output cell.
+> ⏳ Tunggu ~2 menit. FLAML akan coba LightGBM, XGBoost, RandomForest, dll. Progress tampil di output.
 
 ### Lihat hasil terbaik
 
 ```python
-print("=== AutoML Results ===")
-print(f"Best estimator     : {automl.best_estimator}")
-print(f"Best hyperparams   : {automl.best_config}")
-print(f"Best ROC AUC (val) : {1 - automl.best_loss:.4g}")
-print(f"Training duration  : {automl.best_config_train_time:.4g}s")
+if automl_spark.best_config is None:
+    print("No best config found. Try running the AutoML process again with more time budget.")
+else:
+    print("Best hyperparameter config:", automl_spark.best_config)
+    print("Best ROC AUC on validation data: {0:.4g}".format(1 - automl_spark.best_loss))
+    print("Training duration of the best run: {0:.4g} s".format(automl_spark.best_config_train_time))
 ```
 
-> 🔑 **Note**: `automl.best_loss` adalah nilai **loss** (1 − AUC kalau metric=`roc_auc`). Makanya `1 - automl.best_loss` = ROC AUC sesungguhnya.
-
-### Evaluate di test set
-
-```python
-import pandas as pd
-
-# Convert test_data ke pandas untuk predict via FLAML
-test_pdf = test_data.toPandas()
-X_test = pd.DataFrame(test_pdf["features"].tolist(), columns=feature_cols)
-y_test = test_pdf["Exited"]
-
-y_pred_proba = automl.predict_proba(X_test)[:, 1]
-automl_auc = roc_auc_score(y_test, y_pred_proba)
-
-print(f"✅ AutoML test ROC AUC: {automl_auc:.4f}")
-```
+> 🔑 `automl_spark.best_loss` = nilai **loss** (1 − AUC). Maka `1 - best_loss` = ROC AUC sebenarnya.
 
 ---
 
 ## 8. Step 5 — Parallel AutoML pakai Spark
 
-Kalau dataset cukup kecil sehingga muat di satu node, kita bisa **paralelkan** beberapa trial AutoML sekaligus di Spark cluster — proses lebih cepat.
+Kalau dataset cukup kecil sehingga muat di **satu node**, kita bisa **paralelkan** banyak trial AutoML sekaligus di Spark cluster — proses lebih cepat.
 
 ### Convert ke Pandas (bukan Pandas-on-Spark)
 
 ```python
 pandas_df = train_raw.toPandas()
-print(f"pandas_df shape: {pandas_df.shape}")
 ```
 
-> ⚠️ Pakai `train_raw` (sebelum VectorAssembler) karena FLAML butuh format tabular biasa, bukan vector.
+> ⚠️ Pakai `train_raw` (sebelum VectorAssembler) karena FLAML versi paralel butuh tabular biasa, bukan vector kolom.
 
 ### Konfigurasi paralel
 
 ```python
-settings_parallel = {
-    "time_budget": 250,
+# Buat AutoML instance baru
+automl = AutoML()
+
+# Set experiment baru biar terpisah dari Step 4
+mlflow.set_experiment("sample-automl-experiment-spark")
+
+settings = {
+    "time_budget": 120,
+    "max_iter": 3,
     "metric": "roc_auc",
     "task": "classification",
     "seed": 41,
-    "use_spark": True,           # ⬅️ Aktifkan Spark parallelism
-    "n_concurrent_trials": 3,    # 3 trial jalan bareng
-    "force_cancel": True,
-    "mlflow_exp_name": "automl_sample",
+    "use_spark": True,                                  # ⬅️ Aktifkan Spark parallel
+    "n_concurrent_trials": 3,                           # 3 trial bareng
+    "force_cancel": True,                               # Stop kalau lewat budget
+    "mlflow_exp_name": "sample-automl-experiment-spark",
+    "verbose": 1,
 }
 ```
 
 | Setting baru | Penjelasan |
 |---|---|
-| `use_spark=True` | FLAML akan distribusikan trial ke Spark executor |
-| `n_concurrent_trials=3` | 3 model di-train paralel. Sesuaikan dengan jumlah executor di workspace. |
+| `use_spark=True` | FLAML distribusikan trial ke Spark executor |
+| `n_concurrent_trials=3` | 3 model paralel — sesuaikan dengan jumlah executor |
+| `force_cancel=True` | Stop saat lewat `time_budget` → hemat CU |
 
 ### Jalankan paralel
 
 ```python
-with mlflow.start_run(nested=True, run_name="automl_parallel") as parallel_run:
-    automl.fit(
-        dataframe=pandas_df,
-        label="Exited",
-        **settings_parallel,
-    )
-
-print("=== Parallel AutoML Results ===")
-print(f"Best estimator    : {automl.best_estimator}")
-print(f"Best hyperparams  : {automl.best_config}")
-print(f"Best ROC AUC (val): {1 - automl.best_loss:.4g}")
-print(f"Training duration : {automl.best_config_train_time:.4g}s")
+with mlflow.start_run(nested=True, run_name="parallel_trial"):
+    automl.fit(dataframe=pandas_df, label="Exited", **settings)
 ```
 
-> 📚 Detail: [FLAML parallel Spark jobs](https://microsoft.github.io/FLAML/docs/Examples/Integrate%20-%20Spark#parallel-spark-jobs)
-
----
-
-## 9. Step 6 — Bandingkan hasil di MLflow UI
-
-Karena semua run kita log ke experiment **`automl_sample`**, tinggal bandingkan visual:
-
-1. Workspace → klik experiment **`automl_sample`**.
-2. Pilih kolom **ROC_AUC** (atau metric lain) untuk sorting.
-3. Centang 3 run: `baseline_lightgbm`, `automl_trial`, `automl_parallel`.
-4. Klik **Compare** → lihat side-by-side params, metrics, charts.
-
-```mermaid
-flowchart LR
-    A[baseline_lightgbm<br/>manual LightGBM<br/>AUC ~0.84] -.->|compare| C{Pilih<br/>winner}
-    B[automl_trial<br/>FLAML 250s<br/>AUC ~0.85+] -.->|compare| C
-    D[automl_parallel<br/>FLAML 250s + 3 parallel<br/>AUC ~0.85+ lebih cepat] -.->|compare| C
-    C -->|register| E[Model Registry]
-
-    style C fill:#fff4e6,stroke:#f7630c
-    style E fill:#f3e8ff,stroke:#8764b8
-```
-
-> 💡 Biasanya AutoML **sedikit lebih bagus** dari baseline manual, tapi bukan magic — kalau dataset memang sulit, AutoML pun terbatas.
-
----
-
-## 10. Step 7 — Register & gunakan model terbaik
-
-Kalau model AutoML lebih bagus, register supaya bisa dipakai di Modul 4 (batch scoring) atau Modul 6 (endpoint).
+### Visualisasi feature importance
 
 ```python
-import mlflow
-from mlflow.models.signature import infer_signature
+import flaml.visualization as fviz
 
-# Train ulang model terbaik di seluruh training data
-best_model = automl.model.estimator   # underlying sklearn-compatible model
+fig = fviz.plot_feature_importance(automl)
 
-# Predict & wrap output sebagai Series (penting untuk Modul 6 endpoint!)
-preds = pd.Series(best_model.predict(X_test), name="prediction")
-signature = infer_signature(X_test, preds)
-
-# Log + register sebagai model baru di Fabric
-with mlflow.start_run(run_name="automl_best_registered"):
-    mlflow.sklearn.log_model(
-        sk_model=best_model,
-        artifact_path="model",
-        signature=signature,
-        input_example=X_test.head(3),
-        registered_model_name="churn_automl_model",
-    )
-
-print("✅ Model registered as 'churn_automl_model'")
+if fig is None:
+    print("No feature importance plot available. Try running the AutoML process again with more time budget.")
+else:
+    fig.show()
 ```
 
-> 🔗 **Lanjut ke**: [Modul 4 — Batch Scoring](./04-batch-scoring.md) untuk inference batch, atau [Modul 6 — ML Model Endpoints](./06-model-endpoints.md) untuk real-time REST API.
+> 📊 Plot interaktif Plotly: lihat fitur mana yang paling berkontribusi (biasanya `Age`, `NumOfProducts`, `Balance` paling tinggi untuk dataset churn ini).
+
+### Lihat hasil
+
+```python
+if automl.best_config is None:
+    print("No best config found. Try running the AutoML process again with more time budget.")
+else:
+    print("Best hyperparmeter config:", automl.best_config)
+    print("Best roc_auc on validation data: {0:.4g}".format(1 - automl.best_loss))
+    print("Training duration of best run: {0:.4g} s".format(automl.best_config_train_time))
+```
+
+### Lihat di MLflow UI
+
+1. Workspace → klik experiment **`sample-automl-experiment`** atau **`sample-automl-experiment-spark`**.
+2. Sortir kolom **roc_auc** untuk lihat run terbaik.
+3. Centang beberapa run → klik **Compare** untuk side-by-side.
+
+---
+
+## 9. Step 6 — Register model terbaik
+
+Setelah AutoML selesai, register model terbaik ke Fabric Model Registry supaya bisa dipakai untuk batch scoring atau endpoint.
+
+```python
+model_name = "churn_model"  # Ganti sesuai keinginan
+
+if automl.best_run_id is None:
+    print("No best run ID found. Try running the AutoML process again with more time budget.")
+    registered_model = None
+else:
+    model_path = f"runs:/{automl.best_run_id}/model"
+    registered_model = mlflow.register_model(model_uri=model_path, name=model_name)
+    print(f"Model '{registered_model.name}' version {registered_model.version} registered successfully.")
+```
+
+> 📦 Cara kerjanya: FLAML otomatis log model terbaik ke MLflow setiap run. `automl.best_run_id` adalah ID MLflow run untuk model terbaik. Kita ambil model dari `runs:/<id>/model` lalu register.
+
+> 🔍 Lihat di UI: Workspace → **ML model** → `churn_model` → akan muncul versionnya.
+
+---
+
+## 10. Step 7 — Batch prediction dengan PREDICT
+
+Microsoft Fabric punya fungsi **`PREDICT`** untuk batch scoring scalable (Spark-distributed). Kita pakai wrapper-nya: `MLFlowTransformer`.
+
+### Cek data test
+
+```python
+display(test_raw)
+```
+
+### Jalankan batch prediction
+
+```python
+from synapse.ml.predict import MLFlowTransformer
+
+if registered_model is None:
+    print("No registered model found. Please ensure the AutoML process completed successfully.")
+    batch_predictions = None
+else:
+    model = MLFlowTransformer(
+        inputCols=feature_cols,
+        outputCol="prediction",
+        modelName=model_name,
+        modelVersion=registered_model.version,
+    )
+
+    batch_predictions = model.transform(test_raw)
+```
+
+### Tampilkan hasil
+
+```python
+display(batch_predictions)
+```
+
+### Simpan ke lakehouse
+
+```python
+if batch_predictions is None:
+    print("No predictions to save. Ensure the model was registered and predictions were generated successfully.")
+else:
+    batch_predictions.write.format("delta").mode("overwrite").save("Files/churn/predictions/batch_predictions")
+```
+
+> 🔗 **Lanjut ke**:
+> - [Modul 4 — Batch Scoring](./04-batch-scoring.md) untuk pola batch scoring lain (PREDICT SQL).
+> - [Modul 5 — Create Report](./05-create-report.md) untuk bikin Power BI report dari hasil prediksi.
+> - [Modul 6 — ML Model Endpoints](./06-model-endpoints.md) untuk deploy ke real-time REST endpoint.
 
 ---
 
@@ -381,23 +528,29 @@ print("✅ Model registered as 'churn_automl_model'")
 
 | Tip | Kenapa |
 |---|---|
-| Mulai dengan `time_budget` kecil (60–120s), lalu naikkan | Cek dulu pipeline benar sebelum buang waktu lama |
-| Selalu set `seed` | Reproducibility |
+| Mulai dengan `time_budget` kecil (60–120s) + `max_iter=3`, lalu naikkan | Cek pipeline benar dulu sebelum buang waktu lama |
+| Selalu set `seed` | Reproducibility — hasil sama di setiap run |
 | Pakai `mlflow_exp_name` yang sama dengan baseline | Mudah bandingkan di MLflow UI |
-| `isUnbalance=True` untuk dataset imbalance | Tanpa ini, FLAML cenderung bias ke kelas mayoritas |
+| `isUnbalance=True` untuk dataset imbalance | Tanpa ini, model bias ke kelas mayoritas |
 | `force_cancel=True` di Fabric | Hindari boros CU kalau lewat budget |
-| Untuk dataset >10GB: pakai Pandas-on-Spark (Step 4), bukan parallel (Step 5) | Step 5 collect data ke 1 node — OOM untuk data besar |
+| **Cleansing dulu sebelum AutoML** | FLAML tidak handle missing values & encoding otomatis |
+| Untuk dataset >10GB: pakai Pandas-on-Spark (Step 4) | Step 5 collect ke 1 node — OOM untuk data besar |
+| Cek feature importance plot | Insight bisnis: fitur mana yang penting |
 
 ### 🐛 Troubleshooting
 
 | Masalah | Penyebab | Solusi |
 |---|---|---|
-| `ModuleNotFoundError: flaml` | Runtime <1.2 | Upgrade Workspace ke Runtime 1.2+ |
+| `ModuleNotFoundError: flaml` | Runtime <1.2 | Upgrade Workspace → Spark settings → Runtime 1.2+ |
+| `Default lakehouse not found` | Lupa attach lakehouse | Sidebar kiri notebook → Add lakehouse |
+| `automl.best_config is None` | Time budget terlalu kecil | Naikkan `time_budget` (mis. 300) atau `max_iter` (mis. 10) |
+| `automl.best_run_id is None` di Step 6 | AutoML tidak sempat selesai 1 trial pun | Naikkan budget |
 | AutoML stuck / hang | `force_cancel=False` + algoritma berat | Set `force_cancel=True` |
 | ROC AUC anjlok di test set | Overfitting ke validation | Naikkan `time_budget`, atau set `early_stop=True` |
 | `OutOfMemoryError` di Step 5 | `toPandas()` collect data terlalu besar | Pakai Step 4 (Pandas-on-Spark) saja, atau perbesar driver |
 | MLflow run tidak muncul | Lupa `mlflow.set_experiment()` | Pastikan dipanggil sebelum `automl.fit()` |
 | `n_concurrent_trials > executors` | Lebih banyak trial dari executor | Cek pool: Workspace settings → Spark pool → max nodes |
+| `MLFlowTransformer` error | Versi model tidak ada | Cek `registered_model.version` benar di Step 6 |
 
 ---
 
@@ -406,27 +559,28 @@ print("✅ Model registered as 'churn_automl_model'")
 Kalau sudah selesai eksperimen:
 
 ```python
-# Hapus model registered (kalau tidak dipakai)
+# Hapus model registered (opsional)
 from mlflow.tracking import MlflowClient
 
 client = MlflowClient()
-client.delete_registered_model(name="churn_automl_model")
+client.delete_registered_model(name="churn_model")
 ```
 
-Atau via UI: Workspace → ML model → ⋯ → **Delete**.
+Atau via UI: Workspace → **ML model** → `churn_model` → ⋯ → **Delete**.
 
-> 📝 **Note**: Experiment `automl_sample` dan run-nya tetap ada untuk audit trail. Hapus manual di UI kalau perlu.
+> 📝 Experiment `sample-automl-experiment` & `sample-automl-experiment-spark` tetap ada untuk audit trail. Hapus manual via UI kalau perlu.
 
 ---
 
 ## 13. Referensi
 
 - 📘 [Create models with Automated ML — MS Learn](https://learn.microsoft.com/en-us/fabric/data-science/how-to-use-automated-machine-learning-fabric) — sumber utama tutorial ini
-- 📘 [What is AutoML in Fabric?](https://learn.microsoft.com/en-us/fabric/data-science/automated-machine-learning-fabric) — konsep dasar
+- 📘 [What is AutoML in Fabric?](https://learn.microsoft.com/en-us/fabric/data-science/automated-machine-learning-fabric) — konsep dasar & daftar model didukung
 - 📘 [Tune AutoML with visualizations](https://learn.microsoft.com/en-us/fabric/data-science/tuning-automated-machine-learning-visualizations) — visualisasi advanced
-- 📘 [FLAML documentation](https://microsoft.github.io/FLAML/) — referensi lengkap library
+- 📘 [Score models with PREDICT](https://learn.microsoft.com/en-us/fabric/data-science/model-scoring-predict) — batch inference
+- 📘 [FLAML documentation](https://microsoft.github.io/FLAML/) — referensi lengkap
 - 📘 [FLAML — Spark integration](https://microsoft.github.io/FLAML/docs/Examples/Integrate%20-%20Spark) — parallel & distributed
-- 📘 [Apache Spark Runtimes in Fabric](https://learn.microsoft.com/en-us/fabric/data-engineering/runtime) — cek FLAML version
+- 📘 [Apache Spark Runtimes in Fabric](https://learn.microsoft.com/en-us/fabric/data-engineering/runtime) — cek versi FLAML
 
 ---
 
